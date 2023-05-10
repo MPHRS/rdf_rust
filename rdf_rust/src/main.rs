@@ -1,9 +1,13 @@
 #![deny(clippy::all)]
-use plotters::prelude::*;
+
+use std::env;
 use std::error::Error;
 use std::fs::File;
+use std::io;
+use std::io::prelude::*;
 use std::io::Write;
 use std::io::{BufRead, BufReader};
+use std::path::Path;
 struct MyBox {
     x: f32,
     y: f32,
@@ -182,15 +186,16 @@ fn rdf(group_a: &Vec<[f32; 3]>, group_b: &Vec<[f32; 3]>, box_obj: &MyBox, dr: f3
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let root = BitMapBackend::new("rdf.png", (640, 480)).into_drawing_area();
-    root.fill(&WHITE)?;
-    let mut rt = ReadTrack::new(r"C:\Users\siera\code\new\Scan_Track\brush").unwrap();
+    println!("Введите путь к файлу TRACK:");
+    let mut track_path = String::new();
+    io::stdin().read_line(&mut track_path)?;
+
+    let track_path = track_path.trim();
+    let mut rt = ReadTrack::new(&track_path)?;
+    let mut rt = ReadTrack::new(track_path)?;
     let mut label = true;
-    let mut group_a: Vec<[f32; 3]> = Vec::new(); // Change the type to Vec<[f32; 3]>
-    let mut group_b: Vec<[f32; 3]> = Vec::new(); // Change the type to Vec<[f32; 3]>
-    let mut _data: Vec<(f32, f32)> = Vec::new();
-    let mut x_values: Vec<f32> = Vec::new();
-    let mut y_values: Vec<f32> = Vec::new();
+    let mut group_a: Vec<[f32; 3]> = Vec::new();
+    let mut group_b: Vec<[f32; 3]> = Vec::new();
 
     while let Ok(result) = rt.one_step() {
         if label {
@@ -203,72 +208,43 @@ fn main() -> Result<(), Box<dyn Error>> {
                     n_b += 1;
                 }
             }
-            group_a = vec![[0.0; 3]; n_a]; // Change the inner type to [f32; 3]
-            group_b = vec![[0.0; 3]; n_b]; // Change the inner type to [f32; 3]
+            group_a = vec![[0.0; 3]; n_a];
+            group_b = vec![[0.0; 3]; n_b];
             label = false;
         }
         let mut it = 0;
         let mut ik = 0;
         for i in 0..rt.num_atoms as usize {
             if rt.btype[i] == 1 {
-                group_a[it] = [rt.x[i], rt.y[i], rt.z[i]]; // Change to array [f32; 3]
+                group_a[it] = [rt.x[i], rt.y[i], rt.z[i]];
                 it += 1;
             } else if rt.btype[i] == 2 {
-                group_b[ik] = [rt.x[i], rt.y[i], rt.z[i]]; // Change to array [f32; 3]
+                group_b[ik] = [rt.x[i], rt.y[i], rt.z[i]];
                 ik += 1;
             }
         }
         if !result {
-            break; // Break the loop if the result is false
+            break;
         }
     }
     println!("{:?}", rt.time_step);
     println!("{:?}", group_a);
     println!("{:?}", group_b);
 
-    let dr = 0.1; // Example value for dr, modify as per your needs
+    let dr = 0.1;
 
-    let rdff = rdf(&group_a, &group_b, &rt.my_box, dr); // Provide the missing `dr` argument
-    let x_values: Vec<f32> = (0..rdff.len()).map(|i| i as f32 * 0.1).collect();
-    let y_values: Vec<f32> = rdff.iter().cloned().collect();
-
-    let root = BitMapBackend::new(
-        r"C:\Users\siera\code\new\Scan_Track\brush\rdf.png",
-        (800, 600),
-    )
-    .into_drawing_area();
-    root.fill(&WHITE)?;
-
-    let (x_min, x_max) = (x_values[0], x_values[x_values.len() - 1]);
-    let (y_min, y_max) = (
-        y_values.iter().fold(f32::INFINITY, |a, &b| a.min(b)),
-        y_values.iter().fold(f32::NEG_INFINITY, |a, &b| a.max(b)),
-    );
-
-    let mut chart = ChartBuilder::on(&root)
-        .x_label_area_size(40)
-        .y_label_area_size(40)
-        .margin(5)
-        .caption("RDF Plot", ("sans-serif", 30.0).into_font())
-        .build_cartesian_2d(x_min..x_max, y_min..y_max)?;
-
-    chart.configure_mesh().x_labels(10).y_labels(10).draw()?;
-
-    chart.draw_series(LineSeries::new(
-        x_values.iter().zip(y_values.iter()).map(|(&x, &y)| (x, y)),
-        &RED,
-    ))?;
-    chart.configure_mesh().x_labels(10).y_labels(10).draw()?;
-
-    chart.draw_series(LineSeries::new(
-        x_values.iter().zip(y_values.iter()).map(|(&x, &y)| (x, y)),
-        &RED,
-    ))?;
-
-    root.present()?;
-
-    let mut file = File::create(r"C:\Users\siera\code\new\Scan_Track\brush\rdf_out.txt")?;
-    file.write_all(format!("{:?}", rdff).as_bytes())?;
-
+    let rdff = rdf(&group_a, &group_b, &rt.my_box, dr);
+    if let Ok(current_dir) = env::current_dir() {
+        let file_path = current_dir.join("rdf_out.txt");
+        if let Some(file_path_str) = file_path.to_str() {
+            let mut file = File::create(file_path_str)?;
+            println!("File path: {}", file_path_str);
+            file.write_all(format!("{:?}", rdff).as_bytes())?;
+        } else {
+            println!("Failed to convert file path to a string.");
+        }
+    } else {
+        println!("Failed to retrieve the current directory.");
+    }
     Ok(())
 }
