@@ -175,32 +175,28 @@ fn rdf(group_a: &Vec<[f32; 3]>, group_b: &Vec<[f32; 3]>, box_obj: &MyBox, dr: f3
         }
     }
 
-    let v_scaled = v
-        .iter()
-        .map(|&v_elem| v_elem / group_b.len() as f32)
-        .collect::<Vec<f32>>();
+    // let v_scaled = v
+    //     .iter()
+    //     .map(|&v_elem| v_elem / group_b.len() as f32)
+    //     .collect::<Vec<f32>>();
     g.iter()
-        .zip(v_scaled.iter())
+        .zip(v.iter())
         .map(|(&g_elem, &v_elem)| g_elem / v_elem)
         .collect()
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    println!("Введите путь к файлу TRACK:");
-    let mut track_path = String::new();
-    io::stdin().read_line(&mut track_path)?;
+    let track_path = env::current_dir()?.to_string_lossy().into_owned();
 
-    let track_path = track_path.trim();
     let mut rt = ReadTrack::new(&track_path)?;
-    let mut rt = ReadTrack::new(track_path)?;
     let mut label = true;
     let mut group_a: Vec<[f32; 3]> = Vec::new();
     let mut group_b: Vec<[f32; 3]> = Vec::new();
 
     while let Ok(result) = rt.one_step() {
         if label {
-            let mut n_a = 0;
-            let mut n_b = 0;
+            let mut n_a: usize = 0;
+            let mut n_b: usize = 0;
             for i in &rt.btype {
                 if *i == 1 {
                     n_a += 1;
@@ -227,9 +223,9 @@ fn main() -> Result<(), Box<dyn Error>> {
             break;
         }
     }
-    println!("{:?}", rt.time_step);
-    println!("{:?}", group_a);
-    println!("{:?}", group_b);
+    // println!("{:?}", rt.time_step);
+    // println!("{:?}", group_a);
+    // println!("{:?}", group_b);
 
     let dr = 0.1;
 
@@ -246,5 +242,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     } else {
         println!("Failed to retrieve the current directory.");
     }
+
+    println!("it's done");
     Ok(())
 }
